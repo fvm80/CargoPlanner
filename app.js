@@ -184,9 +184,29 @@ function drawCargoOnDeck(positionData, containerData){
     const PALLET_AREA_PX = deckData.palletAreaWidth * SCALE_FACTOR; const DIVIDER_PX = deckData.centerDividerWidth * SCALE_FACTOR;
     const y = positionData.yPos === 'L' ? 0 : PALLET_AREA_PX + DIVIDER_PX;
 
-    const rect = createSvgElement('rect', { x:x, y:y, width:width, height:height, id:positionData.id, class:'placed-cargo ' + containerData.id, title:`${containerData.label} ${positionData.yPos} @ ${positionData.startDatum.toFixed(2)}` });
-    deckSvg.appendChild(rect);
-    const text = createSvgElement('text', { x: x + width/2, y: y + height/2, dy:'0.3em', class:'cargo-label' }); text.textContent = containerData.label; deckSvg.appendChild(text);
+    // контейнер с визуальными замками
+const group = createSvgElement('g', { id: positionData.id, class: 'placed-cargo-group' });
+
+// основной прямоугольник
+const rect = createSvgElement('rect', { x:x, y:y, width:width, height:height, class:'placed-cargo ' + containerData.id, title:`${containerData.label} ${positionData.yPos} @ ${positionData.startDatum.toFixed(2)}` });
+group.appendChild(rect);
+
+// текст
+const text = createSvgElement('text', { x: x + width/2, y: y + height/2, dy:'0.3em', class:'cargo-label' });
+text.textContent = containerData.label;
+group.appendChild(text);
+
+// если есть шаблон замков, отрисуем линии
+if(containerData.lockPattern){
+    // создаём временный SVG для отрисовки замков
+    const tempSvg = createSvgElement('svg', { width:width, height:height });
+    drawInternalContainerLocks(tempSvg, containerData);
+    // перемещаем линии замков в group с учётом координат x,y
+    [...tempSvg.children].forEach(ch => { ch.setAttribute('transform', `translate(${x},${y})`); group.appendChild(ch); });
+}
+
+deckSvg.appendChild(group);
+
 }
 
 function redrawAllPlacedCargo(){ const deckSvg = getDeckSvg(); if(!deckSvg) return; // remove previous placed cargo
@@ -269,3 +289,4 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const snapEl = document.getElementById('snap-value');
     if(snapEl) snapEl.textContent = SNAP_RADIUS_IN;
 });
+
