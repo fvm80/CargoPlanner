@@ -1,5 +1,5 @@
 // ----------------- Конфигурация и данные -----------------
-const SCALE_FACTOR = 0.5; // 1 дюйм = 0.5 px
+const SCALE_FACTOR = 1; // 1 дюйм = 0.5 px
 const triangleSize = 5;
 const P_ADJ = triangleSize * SCALE_FACTOR;
 const LOCK_LINE_LENGTH_PX = 6;
@@ -52,7 +52,7 @@ const G_POSITIONS_INPUT = [
 ];
 
 const deckData = {
-    startDatum: 525.5, endDatum: 2217, totalWidth: 196, centerDividerWidth: 10, palletAreaWidth: 93,
+    startDatum: 525.5, endDatum: 2217, totalWidth: 196, centerDividerWidth: 4, palletAreaWidth: 96,
     sections: {
         C: [525.5, 650.5], D: [651.5, 776.5], E: [777.5, 902.5], F: [903.5, 1028.5],
         G: [1029.5, 1154.5], H: [1155.5, 1280.5], J: [1281.5, 1406.5], K: [1407.5, 1532.5],
@@ -161,8 +161,8 @@ function drawCargoDeck(){
         const x = toSvgX(startX); const width = (endX - startX)*SCALE_FACTOR; const halfW = width/2;
         svg.appendChild(createSvgElement('rect',{ x:x, y:0, width:width, height:PALLET_AREA_PX, class:'deck-section', title:`${key}L` }));
         svg.appendChild(createSvgElement('rect',{ x:x, y:PALLET_AREA_PX+DIVIDER_PX, width:width, height:PALLET_AREA_PX, class:'deck-section', title:`${key}R` }));
-        svg.appendChild(createSvgElement('text',{ x:x+halfW, y:Y_CENTER_L, class:'section-label' })).textContent = key + 'L';
         svg.appendChild(createSvgElement('text',{ x:x+halfW, y:Y_CENTER_R, class:'section-label' })).textContent = key + 'R';
+        svg.appendChild(createSvgElement('text',{ x:x+halfW, y:Y_CENTER_L, class:'section-label' })).textContent = key + 'L';
     }
 
     // divider
@@ -409,6 +409,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const snapEl = document.getElementById('snap-value');
     if(snapEl) snapEl.textContent = SNAP_RADIUS_IN;
 });
+
 
 
 
