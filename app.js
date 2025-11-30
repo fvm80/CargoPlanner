@@ -206,53 +206,146 @@ function redrawAllPlacedCargo(){ const deckSvg = getDeckSvg(); if(!deckSvg) retu
 }
 
 // ----------------- Drag & Drop -----------------
-function initDragAndDrop(){
-    for(const key in containerTypes){ const template = containerTypes[key]; const svg = document.getElementById(template.id); if(svg){ svg.addEventListener('mousedown', e=>onMouseDown(e, template)); svg.style.userSelect='none'; }}
-    document.addEventListener('mousemove', onMouseMove); document.addEventListener('mouseup', onMouseUp);
+function initDragAndDrop() {
+    for (const key in containerTypes) {
+        const template = containerTypes[key];
+        const svg = document.getElementById(template.id);
+        if (svg) {
+            // мышь
+            svg.addEventListener('mousedown', e => onMouseDown(e, template));
+            // сенсор
+            svg.addEventListener('touchstart', e => onTouchStart(e, template), { passive: false });
+            svg.style.userSelect = 'none';
+        }
+    }
+
+    // движение мыши и тач
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
+    document.addEventListener('touchend', onTouchEnd);
 }
 
-function onMouseDown(e, templateData){ if(e.button !== 0) return; const deckSvg = getDeckSvg(); if(!deckSvg) return;
-    const originalSvg = e.currentTarget; const clone = originalSvg.cloneNode(true);
-    clone.removeAttribute('id'); clone.classList.add('in-flight'); clone.style.position='absolute'; clone.style.pointerEvents='none'; clone.style.opacity = 0.9;
-    const rect = originalSvg.getBoundingClientRect(); dragState.offsetX = e.clientX - rect.left; dragState.offsetY = e.clientY - rect.top;
-    dragState.isDragging = true; dragState.clonedElement = clone; dragState.containerType = templateData;
-    clone.style.left = e.clientX - dragState.offsetX + 'px'; clone.style.top = e.clientY - dragState.offsetY + 'px'; document.body.appendChild(clone);
+// ----------------- Mouse handlers -----------------
+function onMouseDown(e, templateData) {
+    if (e.button !== 0) return;
+    startDrag(e.clientX, e.clientY, e.currentTarget, templateData);
 }
 
-function onMouseMove(e){ if(!dragState.isDragging || !dragState.clonedElement) return; const clone = dragState.clonedElement; clone.style.left = e.clientX - dragState.offsetX + 'px'; clone.style.top = e.clientY - dragState.offsetY + 'px';
-    // determine which side (L/R) we are hovering
-    const deckSvg = getDeckSvg(); if(!deckSvg) return; const deckRect = deckSvg.getBoundingClientRect(); const cloneRect = clone.getBoundingClientRect(); const cloneCenterY = cloneRect.top + cloneRect.height/2; const deckCenterY = deckRect.top + deckRect.height/2; dragState.currentYPos = cloneCenterY < deckCenterY ? 'L' : 'R';
-    // compute front datum in inches (left edge of clone relative to deck)
-    const frontScreenX = cloneRect.left; // left edge of clone is nose
-    const frontPxRelative = frontScreenX - deckRect.left; const frontDatum = frontPxRelative / SCALE_FACTOR + deckData.startDatum;
-    // find nearest free pos
+function onMouseMove(e) {
+    if (!dragState.isDragging || !dragState.clonedElement) return;
+    moveDrag(e.clientX, e.clientY);
+}
+
+function onMouseUp(e) {
+    if (!dragState.isDragging) return;
+    endDrag();
+}
+
+// ----------------- Touch handlers -----------------
+function onTouchStart(e, templateData) {
+    e.preventDefault(); // важно, чтобы не скроллило страницу
+    const touch = e.touches[0];
+    startDrag(touch.clientX, touch.clientY, e.currentTarget, templateData);
+}
+
+function onTouchMove(e) {
+    e.preventDefault();
+    if (!dragState.isDragging || !dragState.clonedElement) return;
+    const touch = e.touches[0];
+    moveDrag(touch.clientX, touch.clientY);
+}
+
+function onTouchEnd(e) {
+    if (!dragState.isDragging) return;
+    endDrag();
+}
+
+// ----------------- Core drag logic -----------------
+function startDrag(clientX, clientY, originalSvg, templateData) {
+    const deckSvg = getDeckSvg();
+    if (!deckSvg) return;
+
+    const clone = originalSvg.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.classList.add('in-flight');
+    clone.style.position = 'absolute';
+    clone.style.pointerEvents = 'none';
+    clone.style.opacity = 0.9;
+
+    const rect = originalSvg.getBoundingClientRect();
+    dragState.offsetX = clientX - rect.left;
+    dragState.offsetY = clientY - rect.top;
+
+    dragState.isDragging = true;
+    dragState.clonedElement = clone;
+    dragState.containerType = templateData;
+
+    clone.style.left = clientX - dragState.offsetX + 'px';
+    clone.style.top = clientY - dragState.offsetY + 'px';
+    document.body.appendChild(clone);
+}
+
+function moveDrag(clientX, clientY) {
+    const clone = dragState.clonedElement;
+    clone.style.left = clientX - dragState.offsetX + 'px';
+    clone.style.top = clientY - dragState.offsetY + 'px';
+
+    const deckSvg = getDeckSvg();
+    if (!deckSvg) return;
+
+    const deckRect = deckSvg.getBoundingClientRect();
+    const cloneRect = clone.getBoundingClientRect();
+    const cloneCenterY = cloneRect.top + cloneRect.height / 2;
+    const deckCenterY = deckRect.top + deckRect.height / 2;
+    dragState.currentYPos = cloneCenterY < deckCenterY ? 'L' : 'R';
+
+    const frontScreenX = cloneRect.left;
+    const frontPxRelative = frontScreenX - deckRect.left;
+    const frontDatum = frontPxRelative / SCALE_FACTOR + deckData.startDatum;
+
     const nearest = findNearestFreePositionByNose(dragState.containerType, frontDatum);
-    // highlight
     highlightNearestPosition(nearest);
 }
 
-function onMouseUp(e){ if(!dragState.isDragging) return; const clone = dragState.clonedElement; dragState.isDragging = false; const deckSvg = getDeckSvg(); const deckRect = deckSvg.getBoundingClientRect();
-    if(clone){ const cloneRect = clone.getBoundingClientRect(); // check if left edge (nose) is over deck horizontally and vertically center is inside
-        const frontScreenX = cloneRect.left; const frontPxRelative = frontScreenX - deckRect.left; const frontDatum = frontPxRelative / SCALE_FACTOR + deckData.startDatum;
-        // check vertical center
-        const centerY = cloneRect.top + cloneRect.height/2;
-        if(frontPxRelative > 0 && frontPxRelative < deckRect.width && centerY > deckRect.top && centerY < deckRect.bottom){
+function endDrag() {
+    const clone = dragState.clonedElement;
+    dragState.isDragging = false;
+
+    if (clone) {
+        const deckSvg = getDeckSvg();
+        const deckRect = deckSvg.getBoundingClientRect();
+        const cloneRect = clone.getBoundingClientRect();
+        const frontScreenX = cloneRect.left;
+        const frontPxRelative = frontScreenX - deckRect.left;
+        const frontDatum = frontPxRelative / SCALE_FACTOR + deckData.startDatum;
+        const centerY = cloneRect.top + cloneRect.height / 2;
+
+        if (frontPxRelative > 0 && frontPxRelative < deckRect.width && centerY > deckRect.top && centerY < deckRect.bottom) {
             const nearest = findNearestFreePositionByNose(dragState.containerType, frontDatum);
-            if(nearest){ // place
-                const newId = `cargo-${occupiedPositions.length+1}`;
-                const placed = { id:newId, type: nearest.type, templateId: dragState.containerType.id, label:dragState.containerType.label, yPos:nearest.yPos, startDatum: nearest.startDatum, endDatum: nearest.endDatum };
+            if (nearest) {
+                const newId = `cargo-${occupiedPositions.length + 1}`;
+                const placed = {
+                    id: newId,
+                    type: nearest.type,
+                    templateId: dragState.containerType.id,
+                    label: dragState.containerType.label,
+                    yPos: nearest.yPos,
+                    startDatum: nearest.startDatum,
+                    endDatum: nearest.endDatum
+                };
                 occupiedPositions.push(placed);
                 redrawAllPlacedCargo();
-            } else {
-                // optionally flash red or play sound - for now just do nothing
             }
         }
-        // remove highlight
+
         removeHighlights();
         clone.remove();
-        dragState.clonedElement = null; dragState.containerType = null;
+        dragState.clonedElement = null;
+        dragState.containerType = null;
     }
 }
+
 
 // ----------------- Highlight helpers -----------------
 function highlightNearestPosition(pos){ const deckSvg = getDeckSvg(); if(!deckSvg) return; removeHighlights(); if(!pos) return; const x = toSvgX(pos.startDatum); const width = toSvg(pos.endDatum - pos.startDatum); const PALLET_AREA_PX = deckData.palletAreaWidth * SCALE_FACTOR; const DIVIDER_PX = deckData.centerDividerWidth * SCALE_FACTOR; const y = pos.yPos === 'L' ? 0 : PALLET_AREA_PX + DIVIDER_PX; const rect = createSvgElement('rect', { x:x, y:y, width:width, height:toSvg(96), class:'pos-highlight' }); deckSvg.appendChild(rect); }
@@ -277,6 +370,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const snapEl = document.getElementById('snap-value');
     if(snapEl) snapEl.textContent = SNAP_RADIUS_IN;
 });
+
 
 
 
