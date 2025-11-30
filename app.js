@@ -179,54 +179,23 @@ function drawCargoDeck(){
 }
 
 function drawCargoOnDeck(positionData, containerData){
-    const deckSvg = getDeckSvg(); 
-    if(!deckSvg) return;
-
-    const x = toSvgX(positionData.startDatum); 
-    const width = toSvg(containerData.length); 
-    const height = toSvg(containerData.width);
-
-    const PALLET_AREA_PX = deckData.palletAreaWidth * SCALE_FACTOR; 
-    const DIVIDER_PX = deckData.centerDividerWidth * SCALE_FACTOR;
+    const deckSvg = getDeckSvg(); if(!deckSvg) return;
+    const x = toSvgX(positionData.startDatum); const width = toSvg(containerData.length); const height = toSvg(containerData.width);
+    const PALLET_AREA_PX = deckData.palletAreaWidth * SCALE_FACTOR; const DIVIDER_PX = deckData.centerDividerWidth * SCALE_FACTOR;
     const y = positionData.yPos === 'L' ? 0 : PALLET_AREA_PX + DIVIDER_PX;
 
-    // создаём группу, чтобы держать прямоугольник + текст + замки
-    const group = createSvgElement('g', { id: positionData.id, class: 'placed-cargo-group' });
-
-    // основной прямоугольник контейнера
-    const rect = createSvgElement('rect', { 
-        x:x, 
-        y:y, 
-        width:width, 
-        height:height, 
-        class:'placed-cargo ' + containerData.id, 
-        title:`${containerData.label} ${positionData.yPos} @ ${positionData.startDatum.toFixed(2)}`
-    });
-    group.appendChild(rect);
-
-    // текст
-    const text = createSvgElement('text', { 
-        x: x + width/2, 
-        y: y + height/2, 
-        dy:'0.3em', 
-        class:'cargo-label' 
-    });
-    text.textContent = containerData.label;
-    group.appendChild(text);
-
-    // добавляем линии замков, если есть lockPattern
-    if(containerData.lockPattern){
-        const tempSvg = createSvgElement('svg', { width:width, height:height });
-        drawInternalContainerLocks(tempSvg, containerData);
-        [...tempSvg.children].forEach(ch => { 
-            ch.setAttribute('transform', `translate(${x},${y})`); 
-            group.appendChild(ch); 
-        });
-    }
-
-    deckSvg.appendChild(group);
+    const rect = createSvgElement('rect', { x:x, y:y, width:width, height:height, id:positionData.id, class:'placed-cargo ' + containerData.id, title:`${containerData.label} ${positionData.yPos} @ ${positionData.startDatum.toFixed(2)}` });
+    deckSvg.appendChild(rect);
+    const text = createSvgElement('text', { x: x + width/2, y: y + height/2, dy:'0.3em', class:'cargo-label' }); text.textContent = containerData.label; deckSvg.appendChild(text);
 }
 
+function redrawAllPlacedCargo(){ const deckSvg = getDeckSvg(); if(!deckSvg) return; // remove previous placed cargo
+    // remove previously drawn items (by class placed-cargo and cargo-label and pos-highlight)
+    [...deckSvg.querySelectorAll('.placed-cargo, .cargo-label, .pos-highlight')].forEach(n=>n.remove());
+    for(const pos of occupiedPositions){ const type = Object.values(containerTypes).find(c=>c.id === pos.templateId); const containerData = type || containerTypes[pos.type + '_SIZE'] || null; const cdata = containerData || { length: (pos.endDatum - pos.startDatum), width:96, id: pos.templateId || '' };
+        drawCargoOnDeck(pos, cdata);
+    }
+}
 
 function redrawAllPlacedCargo(){ const deckSvg = getDeckSvg(); if(!deckSvg) return; // remove previous placed cargo
     // remove previously drawn items (by class placed-cargo and cargo-label and pos-highlight)
@@ -308,6 +277,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const snapEl = document.getElementById('snap-value');
     if(snapEl) snapEl.textContent = SNAP_RADIUS_IN;
 });
+
 
 
 
