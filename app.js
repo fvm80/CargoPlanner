@@ -205,67 +205,58 @@ function redrawAllPlacedCargo(){ const deckSvg = getDeckSvg(); if(!deckSvg) retu
     }
 }
 
-// ----------------- Drag & Drop -----------------
+// ----------------- Drag & Drop (новый) -----------------
 function initDragAndDrop() {
+    // Шаблоны контейнеров
     for (const key in containerTypes) {
         const template = containerTypes[key];
         const svg = document.getElementById(template.id);
         if (svg) {
             // мышь
-            svg.addEventListener('mousedown', e => onMouseDown(e, template));
-            // сенсор
+            svg.addEventListener('mousedown', e => onDragStart(e, template));
+            // тач
             svg.addEventListener('touchstart', e => onTouchStart(e, template), { passive: false });
             svg.style.userSelect = 'none';
         }
     }
 
-    // движение мыши и тач
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
+    // На документе ловим движение и отпускание
+    document.addEventListener('mousemove', onDragMove);
+    document.addEventListener('mouseup', onDragEnd);
     document.addEventListener('touchmove', onTouchMove, { passive: false });
     document.addEventListener('touchend', onTouchEnd);
 }
 
-// ----------------- Mouse handlers -----------------
-function onMouseDown(e, templateData) {
-    if (e.button !== 0) return;
-    startDrag(e.clientX, e.clientY, e.currentTarget, templateData);
-}
-
-function onMouseMove(e) {
-    if (!dragState.isDragging || !dragState.clonedElement) return;
-    moveDrag(e.clientX, e.clientY);
-}
-
-function onMouseUp(e) {
-    if (!dragState.isDragging) return;
-    endDrag();
-}
-
-// ----------------- Touch handlers -----------------
+// ----------------- Mouse / Touch wrappers -----------------
 function onTouchStart(e, templateData) {
-    e.preventDefault(); // важно, чтобы не скроллило страницу
+    e.preventDefault();
     const touch = e.touches[0];
-    startDrag(touch.clientX, touch.clientY, e.currentTarget, templateData);
+    onDragStart({ clientX: touch.clientX, clientY: touch.clientY, currentTarget: e.currentTarget, button: 0 }, templateData);
 }
 
 function onTouchMove(e) {
     e.preventDefault();
-    if (!dragState.isDragging || !dragState.clonedElement) return;
     const touch = e.touches[0];
-    moveDrag(touch.clientX, touch.clientY);
+    onDragMove({ clientX: touch.clientX, clientY: touch.clientY });
 }
 
 function onTouchEnd(e) {
-    if (!dragState.isDragging) return;
-    endDrag();
+    onDragEnd(e);
 }
 
-// ----------------- Core drag logic -----------------
-function startDrag(clientX, clientY, originalSvg, templateData) {
+// ----------------- Core drag functions -----------------
+function onDragStart(e, templateData, existingPos = null) {
+    if (e.button !== 0) return;
     const deckSvg = getDeckSvg();
     if (!deckSvg) return;
 
+    // Если это уже размещённый контейнер — временно удаляем его
+    if (existingPos) {
+        occupiedPositions = occupiedPositions.filter(p => p.id !== existingPos.id);
+        redrawAllPlacedCargo();
+    }
+
+    const originalSvg = e.currentTarget;
     const clone = originalSvg.cloneNode(true);
     clone.removeAttribute('id');
     clone.classList.add('in-flight');
@@ -274,22 +265,25 @@ function startDrag(clientX, clientY, originalSvg, templateData) {
     clone.style.opacity = 0.9;
 
     const rect = originalSvg.getBoundingClientRect();
-    dragState.offsetX = clientX - rect.left;
-    dragState.offsetY = clientY - rect.top;
+    dragState.offsetX = e.clientX - rect.left;
+    dragState.offsetY = e.clientY - rect.top;
 
     dragState.isDragging = true;
     dragState.clonedElement = clone;
     dragState.containerType = templateData;
+    dragState.existingPos = existingPos; // сохраняем для редактирования
 
-    clone.style.left = clientX - dragState.offsetX + 'px';
-    clone.style.top = clientY - dragState.offsetY + 'px';
+    clone.style.left = e.clientX - dragState.offsetX + 'px';
+    clone.style.top = e.clientY - dragState.offsetY + 'px';
     document.body.appendChild(clone);
 }
 
-function moveDrag(clientX, clientY) {
+function onDragMove(e) {
+    if (!dragState.isDragging || !dragState.clonedElement) return;
+
     const clone = dragState.clonedElement;
-    clone.style.left = clientX - dragState.offsetX + 'px';
-    clone.style.top = clientY - dragState.offsetY + 'px';
+    clone.style.left = e.clientX - dragState.offsetX + 'px';
+    clone.style.top = e.clientY - dragState.offsetY + 'px';
 
     const deckSvg = getDeckSvg();
     if (!deckSvg) return;
@@ -308,7 +302,9 @@ function moveDrag(clientX, clientY) {
     highlightNearestPosition(nearest);
 }
 
-function endDrag() {
+function onDragEnd(e) {
+    if (!dragState.isDragging) return;
+
     const clone = dragState.clonedElement;
     dragState.isDragging = false;
 
@@ -324,17 +320,26 @@ function endDrag() {
         if (frontPxRelative > 0 && frontPxRelative < deckRect.width && centerY > deckRect.top && centerY < deckRect.bottom) {
             const nearest = findNearestFreePositionByNose(dragState.containerType, frontDatum);
             if (nearest) {
-                const newId = `cargo-${occupiedPositions.length + 1}`;
-                const placed = {
-                    id: newId,
-                    type: nearest.type,
-                    templateId: dragState.containerType.id,
-                    label: dragState.containerType.label,
-                    yPos: nearest.yPos,
-                    startDatum: nearest.startDatum,
-                    endDatum: nearest.endDatum
-                };
-                occupiedPositions.push(placed);
+                if (dragState.existingPos) {
+                    // обновляем уже размещённый контейнер
+                    dragState.existingPos.startDatum = nearest.startDatum;
+                    dragState.existingPos.endDatum = nearest.endDatum;
+                    dragState.existingPos.yPos = nearest.yPos;
+                    occupiedPositions.push(dragState.existingPos);
+                } else {
+                    // новый контейнер
+                    const newId = `cargo-${occupiedPositions.length + 1}`;
+                    const placed = {
+                        id: newId,
+                        type: nearest.type,
+                        templateId: dragState.containerType.id,
+                        label: dragState.containerType.label,
+                        yPos: nearest.yPos,
+                        startDatum: nearest.startDatum,
+                        endDatum: nearest.endDatum
+                    };
+                    occupiedPositions.push(placed);
+                }
                 redrawAllPlacedCargo();
             }
         }
@@ -343,7 +348,41 @@ function endDrag() {
         clone.remove();
         dragState.clonedElement = null;
         dragState.containerType = null;
+        dragState.existingPos = null;
     }
+}
+
+// ----------------- Добавление событий для уже размещённых контейнеров -----------------
+function makePlacedContainersDraggable() {
+    const deckSvg = getDeckSvg();
+    if (!deckSvg) return;
+
+    [...deckSvg.querySelectorAll('.placed-cargo')].forEach(rect => {
+        const pos = occupiedPositions.find(p => p.id === rect.id);
+        if (!pos) return;
+        const containerData = Object.values(containerTypes).find(c => c.id === pos.templateId) || containerTypes[pos.type + '_SIZE'];
+
+        rect.addEventListener('mousedown', e => onDragStart(e, containerData, pos));
+        rect.addEventListener('touchstart', e => onTouchStart(e, containerData, pos), { passive: false });
+    });
+}
+
+// ----------------- Обновление redrawAllPlacedCargo -----------------
+function redrawAllPlacedCargo() {
+    const deckSvg = getDeckSvg();
+    if (!deckSvg) return;
+
+    [...deckSvg.querySelectorAll('.placed-cargo, .cargo-label, .pos-highlight')].forEach(n => n.remove());
+
+    for (const pos of occupiedPositions) {
+        const type = Object.values(containerTypes).find(c => c.id === pos.templateId);
+        const containerData = type || containerTypes[pos.type + '_SIZE'] || null;
+        const cdata = containerData || { length: (pos.endDatum - pos.startDatum), width: 96, id: pos.templateId || '' };
+        drawCargoOnDeck(pos, cdata);
+    }
+
+    // после перерисовки — делаем контейнеры снова draggable
+    makePlacedContainersDraggable();
 }
 
 
@@ -370,6 +409,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const snapEl = document.getElementById('snap-value');
     if(snapEl) snapEl.textContent = SNAP_RADIUS_IN;
 });
+
 
 
 
