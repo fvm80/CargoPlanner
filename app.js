@@ -190,10 +190,10 @@ function drawCargoOnDeck(positionData, containerData){
     const DIVIDER_PX = deckData.centerDividerWidth * SCALE_FACTOR;
     const y = positionData.yPos === 'L' ? 0 : PALLET_AREA_PX + DIVIDER_PX;
 
-    // создаём группу для контейнера
+    // создаём группу, чтобы держать прямоугольник + текст + замки
     const group = createSvgElement('g', { id: positionData.id, class: 'placed-cargo-group' });
 
-    // основной прямоугольник
+    // основной прямоугольник контейнера
     const rect = createSvgElement('rect', { 
         x:x, 
         y:y, 
@@ -214,18 +214,19 @@ function drawCargoOnDeck(positionData, containerData){
     text.textContent = containerData.label;
     group.appendChild(text);
 
-    // линии замков внутри контейнера
+    // добавляем линии замков, если есть lockPattern
     if(containerData.lockPattern){
         const tempSvg = createSvgElement('svg', { width:width, height:height });
         drawInternalContainerLocks(tempSvg, containerData);
         [...tempSvg.children].forEach(ch => { 
-            // трансформ не нужен, линии уже внутри контейнера
+            ch.setAttribute('transform', `translate(${x},${y})`); 
             group.appendChild(ch); 
         });
     }
 
     deckSvg.appendChild(group);
 }
+
 
 function redrawAllPlacedCargo(){ const deckSvg = getDeckSvg(); if(!deckSvg) return; // remove previous placed cargo
     // remove previously drawn items (by class placed-cargo and cargo-label and pos-highlight)
@@ -307,6 +308,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const snapEl = document.getElementById('snap-value');
     if(snapEl) snapEl.textContent = SNAP_RADIUS_IN;
 });
+
 
 
 
