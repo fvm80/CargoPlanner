@@ -5,7 +5,7 @@ const P_ADJ = triangleSize * SCALE_FACTOR;
 const LOCK_LINE_LENGTH_PX = 6;
 const SVG_CANVAS_ID = 'cargo-deck-svg';
 
-const SNAP_RADIUS_IN = 6; // радиус примагничивания в дюймах
+const SNAP_RADIUS_IN = 12; // радиус примагничивания в дюймах
 
 const R_POSITIONS_INPUT = [
     "531,5 - 727,5", "551,625 - 747,625", "571,75 - 767,75", "591,875 - 787,875",
@@ -370,6 +370,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const snapEl = document.getElementById('snap-value');
     if(snapEl) snapEl.textContent = SNAP_RADIUS_IN;
 });
+
 
 
 
