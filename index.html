@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Планировщик Загрузки B747-400 (Главная Палуба)</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icons/icon-192.png">
+</head>
+<body>
+
+<h1>Планировщик Загрузки B747-400 — Главная Палуба (C..S)</h1>
+
+<div id="controls">
+    <button id="export-btn">Экспорт размещений</button>
+    <button id="clear-btn">Очистить размещения</button>
+    <div class="small">SNAP_RADIUS = <span id="snap-value">6</span> дюймов</div>
+</div>
+
+<div id="cargo-deck-container"></div>
+<p id="legend"></p>
+
+<h2>Шаблоны Грузовых Единиц</h2>
+<div id="templates-container"></div>
+
+<script src="app.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('service-worker.js')
+      .then(reg => console.log('ServiceWorker зарегистрирован:', reg.scope))
+      .catch(err => console.log('Ошибка регистрации ServiceWorker:', err));
+  });
+}
+</script>
+
+</body>
+</html>
